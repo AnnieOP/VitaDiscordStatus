@@ -753,6 +753,10 @@ app.on('second-instance', () => {
 });
 
 app.on('ready', () => {
+
+    // Legacy (v2) log in method is not working, so let's force it to use v3
+    store.set('legacy', false);
+
     // Fix for #26
     if (process.platform === 'darwin')
     {
