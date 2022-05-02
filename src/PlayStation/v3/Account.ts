@@ -2,7 +2,7 @@ import { IOAuthTokenRefreshRequest } from './Model/AuthenticationModel';
 import axios from 'axios';
 import appEvent from '../../Events';
 import { IProfileModel } from './Model/ProfileModel';
-import { IBasicPresence, IPresenceModel } from './Model/PresenceModel';
+import { IBasicPresence, IGameTitleInfoList, IPresenceModel } from './Model/PresenceModel';
 import _store = require('electron-store');
 const store = new _store();
 
@@ -12,6 +12,8 @@ import { IAccount } from '../IAccount';
 import { IOAuthTokenResponse } from '../../Model/IOAuthTokenResponse';
 import AbstractProfile from '../AbstractProfile';
 import Profile from './Profile';
+import _ = require('lodash');
+import log = require('electron-log');
 
 const clientAuthorization = 'YWM4ZDE2MWEtZDk2Ni00NzI4LWIwZWEtZmZlYzIyZjY5ZWRjOkRFaXhFcVhYQ2RYZHdqMHY=';
 
@@ -166,9 +168,38 @@ export class PlayStationAccount implements IAccount
             .then((response) => {
                 const responseBody = response.data;
 
-                appEvent.emit('presence-data', responseBody.basicPresence);
+                if(responseBody.basicPresence.gameTitleInfoList)
+                {
+                    // User is playing, just send the basic presence data
+                    appEvent.emit('presence-data', responseBody.basicPresence);
 
-                return resolve(new Presence(responseBody.basicPresence));
+                    return resolve(new Presence(responseBody.basicPresence));
+                }else
+                {
+                    // if user is not playing then check for other presences using this v1 method
+                    axios.get('https://us-prof.np.community.playstation.net/userProfile/v1/users/me/profile2?fields=presences(@titleInfo)', {
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`
+                        }
+                    })
+                    .then((response) => {
+                        const otherOnlinePresence = _.find(response.data.profile.presences, (p: { onlineStatus : string; }) => p.onlineStatus === 'online');
+
+                        if(otherOnlinePresence && otherOnlinePresence.npTitleId)
+                        {
+                            responseBody.basicPresence = this.convertToBasicPresence(responseBody.basicPresence.accountId, otherOnlinePresence);
+                        }
+                    })
+                    .catch((err) => {
+                        log.error('Error fetching other presences', err);
+                    }).finally(() => {
+
+                        appEvent.emit('presence-data', responseBody.basicPresence);
+
+                        return resolve(new Presence(responseBody.basicPresence));
+                    });
+
+                }
             })
             .catch((err) => {
                 appEvent.emit('presence-data-failed', err);
@@ -258,5 +289,29 @@ export class PlayStationAccount implements IAccount
                 return reject(err);
             });
         });
+    }
+
+    private convertToBasicPresence(accountId: string, otherOnlinePresence: any)
+    {
+        // Matching this online presence format to the basic presence format
+        const basicPresence = {
+                accountId,
+                availability :'availableToPlay',
+                lastAvailableDate : new Date(),
+                primaryPlatformInfo : {
+                    onlineStatus: otherOnlinePresence.onlineStatus,
+                    platform: otherOnlinePresence.platform,
+                    lastOnlineDate :  new Date()
+                },
+                gameTitleInfoList : [{
+                    npTitleId : otherOnlinePresence.npTitleId,
+                    titleName : otherOnlinePresence.titleName,
+                    format : otherOnlinePresence.platform,
+                    launchPlatform : otherOnlinePresence.platform,
+                    gameStatus : otherOnlinePresence.onlineStatus
+                }]
+            };
+
+        return basicPresence;
     }
 }
