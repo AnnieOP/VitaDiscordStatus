@@ -176,7 +176,7 @@ export class PlayStationAccount implements IAccount
                     return resolve(new Presence(responseBody.basicPresence));
                 }else
                 {
-                    // if user is not playing then check for other presences using this v1 method
+                    // if user is not playing in the main platform then check for other presences using this v1 method
                     axios.get('https://us-prof.np.community.playstation.net/userProfile/v1/users/me/profile2?fields=presences(@titleInfo)', {
                         headers: {
                             Authorization: `Bearer ${accessToken}`
