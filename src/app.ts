@@ -368,7 +368,7 @@ function updateRichPresence() : void
             // const previousPresenceTitleInfo = _.get(previousPresence, ['gameTitleInfoList', 0]);
 
             resolvePlatform(platform).then((playstationConsole) => {
-                if (playstationConsole.type !== discordController.currentConsole.type)
+                if (!discordController.currentConsole || playstationConsole.type !== discordController.currentConsole.type)
                 {
                     log.info('Switching console to', platform);
 
