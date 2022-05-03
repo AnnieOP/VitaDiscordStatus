@@ -258,20 +258,10 @@ function spawnMainWindow() : void
         playstationAccount.profile()
         .then((profile) => {
             log.debug('Got PSN profile info', profile);
+
             mainWindow.webContents.send('profile-data', { onlineId: profile.onlineId(), avatarUrl: profile.avatarUrl() });
 
-            // Resolve current presence to login to Discord properly.
-            playstationAccount.presences().then((presence) => {
-                if (presence.onlineStatus() === 'online') {
-                    resolvePlatform(presence.platform()).then(platform => {
-                        discordController.init(platform).then(() => {
-                            appEvent.emit('start-rich-presence');
-                        });
-                    }).catch(() => {
-                        showMessageAndDie('Failed finding supported platform using the platform returned from API.');
-                    });
-                }
-            });
+            appEvent.emit('start-rich-presence');
 
         }).catch((err) => {
             log.error('Failed fetching PSN profile', err);
@@ -585,7 +575,7 @@ appEvent.on('start-rich-presence', () => {
         updateRichPresence();
 
         // Set the loop timeout id so it can be cancelled globally.
-        updateRichPresenceLoop = setInterval(updateRichPresence, 15000);
+        updateRichPresenceLoop = setInterval(updateRichPresence, 60000);
     }
 });
 
